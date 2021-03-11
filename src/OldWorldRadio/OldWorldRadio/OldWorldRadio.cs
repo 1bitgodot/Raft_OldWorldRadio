@@ -59,9 +59,6 @@ public class OldWorldRadio : Mod {
 		traverse.Property("UniqueIndex").SetValue(ITEM_ID);
 		traverse.Field("settings_Inventory").Property("DisplayName").SetValue(ITEM_DISPLAYNAME);
 		traverse.Field("settings_Inventory").Property("Description").SetValue(ITEM_DESCRIPTION);
-//		RAPI.AddItemToBlockQuadType(radio, RBlockQuadType.quad_floor);
-//		RAPI.AddItemToBlockQuadType(radio, RBlockQuadType.quad_foundation);
-//		RAPI.AddItemToBlockQuadType(radio, RBlockQuadType.quad_table);
 		RAPI.RegisterItem(radio);
 		Info($"{ITEM_DISPLAYNAME} item created.");
 		return true;
@@ -74,7 +71,7 @@ public class OldWorldRadio : Mod {
 	}
 
 
-	Slot GetRadioSlot() { 
+	Slot GetRadioSlot() {
 		if (player == null) return null;
 		if (IsRadioSlot(radioSlot)) return radioSlot;
 		var slots = player.Inventory.allSlots;
@@ -93,7 +90,7 @@ public class OldWorldRadio : Mod {
 		if (status == holding) return;
 		audioSource.volume = (holding = status) ? audioVolume : 0;
 		Info(holding ?
-			$"{ITEM_DISPLAYNAME} is switched on."  :
+			$"{ITEM_DISPLAYNAME} is switched on." :
 			$"{ITEM_DISPLAYNAME} is switched off.");
 	}
 
@@ -105,7 +102,7 @@ public class OldWorldRadio : Mod {
 			Info($"Player already has {ITEM_DISPLAYNAME}.");
 			return false;
 		}
-		//	RAPI.GiveItem(radio, 1);
+	//	RAPI.GiveItem(radio, 1);
 		player.Inventory.AddItem(ITEM_NAME, 1);
 		dropped = false;
 		Info($"Gave {ITEM_DISPLAYNAME} to player.");
@@ -210,25 +207,25 @@ public class OldWorldRadio : Mod {
 	}
 
 
-	[ConsoleCommand("take_radio","Remove radio from player inventory.")]
-	public static string TakeRadioCommand(string [] args) {
+	[ConsoleCommand("take_radio", "Remove radio from player inventory.")]
+	public static string TakeRadioCommand(string[] args) {
 		var result = instance.TakeRadioFromPlayer();
 		return "take_radio " + (result ? "success." : "failed.");
 	}
 
 
 	[ConsoleCommand("give_radio", "Add radio to player inventory.")]
-	public static string GiveRadioCommand(string [] args) {
+	public static string GiveRadioCommand(string[] args) {
 		var result = instance.GiveRadioToPlayer();
 		return "give_radio " + (result ? "success." : "failed.");
 	}
 
 	[ConsoleCommand("radio_volume", "Get and set the radio volume.")]
-	public static string RadioVolumeCommand(string [] args) {
+	public static string RadioVolumeCommand(string[] args) {
 		float value = instance.audioVolume * 100;
 		if (args.Length == 0) return $"{ITEM_DISPLAYNAME} volume is at {value:N0}%";
 		var argument = args[0].Trim(); if (argument.EndsWith("%"))
-			argument = argument.Substring(0,argument.Length - 1);
+			argument = argument.Substring(0, argument.Length - 1);
 		if (!float.TryParse(argument, out value) || value < 0 || value > 100)
 			return "Volume must be a value from 0 to 100.";
 		instance.audioVolume = value / 100;
@@ -236,90 +233,4 @@ public class OldWorldRadio : Mod {
 		return $"Radio volume set to {value:N0}%";
 	}
 
-
-	/*
-
-
-
-		private int track;
-
-		public void StartAudio() {
-			if (audioSource != null) {
-				var name = trackNames[track];
-				var displayName = name.Substring(9 + 7);
-				var clip = assetBundle.LoadAsset<AudioClip>(name);
-				if (radioState) Debug.Log($"[{MOD_NAME}] Info: {ITEM_NAME} now playing '{displayName}'.");
-				audioSource.clip = clip; audioSource.Play();
-				if (++track >= trackNames.Length) track = 0;
-				Invoke("StartAudio", clip.length + 0.5f);
-			}
-		}
-
-
-		public void CloseAudio() {
-			audioSource.Stop();
-			Destroy(audioSource);
-			audioSource = null;
-		}
-
-		public void SwitchOnRadio() {
-			if (audioSource != null) {
-				audioSource.volume = 0.5f; radioState = true;
-				Debug.Log($"[{MOD_NAME}] Info: {ITEM_NAME} has been switched on.");
-			}
-		}
-
-
-		public void SwitchOffRadio() {
-			if (audioSource != null) {
-				audioSource.volume = 0.0f; radioState = false;
-				Debug.Log($"[{MOD_NAME}] Info: {ITEM_NAME} has been switched off.");
-			}
-		}
-
-
-		public bool HasItemBeenMoved() {
-			if (player == null || itemSlot == null) return false;
-			var item = itemSlot.GetItemBase();
-			if (item == null || item.UniqueIndex != ITEM_ID) {
-				var oldSlot = itemSlot;
-				var newSlot = GetItemInventorySlot();
-				if (newSlot != null) { 
-					if (oldSlot.slotType == SlotType.Hotbar && newSlot.slotType != SlotType.Hotbar) SwitchOffRadio(); else
-					if (oldSlot.slotType != SlotType.Hotbar && newSlot.slotType == SlotType.Hotbar) SwitchOnRadio();
-				}
-				return true;
-			}
-			return false;
-		}
-
-
-		public void Update() {
-			if (HasItemBeenMoved()) {
-				Debug.Log($"[{MOD_NAME}] Info: {ITEM_NAME} has been moved to another slot.");
-				Debug.Log($"[{MOD_NAME}] Info: {ITEM_NAME} is in the {itemSlot.slotType}.");
-			}
-		}
-
-		private IEnumerator OnModLoading() {
-			 = FindObjectOfType<HNotify>().AddNotification(HNotify.NotificationType.spinning, $"Loading {MOD_NAME} ...");
-			Debug.Log($"[{MOD_NAME}] Info: {trackNames.Length} songs loaded.");
-		//	Randomize starting track
-			track = Random.Range(0, trackNames.Length - 1);
-			audioSource = gameObject.GetComponent<AudioSource>();
-			if (audioSource == null) audioSource =
-				gameObject.AddComponent<AudioSource>();
-			audioSource.volume = 0;
-			notification.Close();
-			player = RAPI.GetLocalPlayer();
-			GiveRadioToPlayer();
-		}
-
-
-		public void OnModUnload() {
-			if (carrying) RemoveItemFromPlayer();
-			assetBundle.Unload(true);
-			Debug.Log($"Mod {MOD_NAME} unloaded.");
-		}
-	*/
 }
