@@ -8,7 +8,7 @@
   "banner": "banner.jpg",
   "gameVersion": "0.1",
   "requiredByAllPlayers": false,
-  "updateUrl": "https://www.raftmodding.com/api/v1/mods/YOUR-MOD-SLUG-HERE/version.txt",
+  "updateUrl": "https://www.raftmodding.com/api/v1/mods/old-world-radio/version.txt",
   "isModPermanent": true,
   "excludedFiles": []
 }
