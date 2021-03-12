@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEngine;
 
 public class OldWorldRadio : Mod {
+	const string BUILD_NAME = "Choerry";
 	const string MOD_NAME = "OldWorldRadio";
 	const string HARMONY_ID = "my.1bitgodot.oldworldradio";
 	const string ITEM_NAME = "OldWorldRadio";
@@ -27,10 +28,12 @@ public class OldWorldRadio : Mod {
 	Network_Player player;
 	Slot radioSlot;
 	bool dropped;
-	bool holding;
+	bool radioOn;
 	HNotify notify;
 	HNotification notifyLoad;
 	AssetBundle assetBundle;
+	GameObject audioGameObject;
+	AudioEchoFilter audioEchoFilter;
 	AudioSource audioSource;
 	List<string> audioClips;
 	float audioVolume = DEFAULT_AUDIO_VOLUME;
@@ -50,7 +53,7 @@ public class OldWorldRadio : Mod {
 	bool CreateRadioItem() {
 		if (radio != null) return false;
 		radio = ItemManager.GetItemByIndex(ITEM_ID);
-		if (radio != null) { Info($"{ITEM_DISPLAYNAME} item already created."); return false; }
+		if (radio != null) { Error($"{ITEM_DISPLAYNAME} item already created."); return false; }
 		var originalRadio = ItemManager.GetItemByName("Placeable_Radio");
 		if (originalRadio == null) { Error("Cannot find original radio item."); return false; }
 		radio = Object.Instantiate(originalRadio); radio.name = ITEM_NAME;
@@ -84,22 +87,23 @@ public class OldWorldRadio : Mod {
 	}
 
 
-	void UpdateRadioState() {
+	bool UpdateRadioState() {
+		if (player == null) return false;
 		var slot = GetRadioSlot();
 		var status = (slot != null && slot.slotType == SlotType.Hotbar);
-		if (status == holding) return;
-		audioSource.volume = (holding = status) ? audioVolume : 0;
-		Info(holding ?
+		if (status == radioOn) return false;
+		audioSource.volume = (radioOn = status) ? audioVolume : 0;
+		Info(radioOn ?
 			$"{ITEM_DISPLAYNAME} is switched on." :
 			$"{ITEM_DISPLAYNAME} is switched off.");
+		return true;
 	}
 
 
 	bool GiveRadioToPlayer() {
-		if (player == null) player = RAPI.GetLocalPlayer();
 		if (player == null) return false;
 		if (GetRadioSlot() != null) {
-			Info($"Player already has {ITEM_DISPLAYNAME}.");
+			Error($"Player already has {ITEM_DISPLAYNAME}.");
 			return false;
 		}
 	//	RAPI.GiveItem(radio, 1);
@@ -111,25 +115,73 @@ public class OldWorldRadio : Mod {
 
 
 	bool TakeRadioFromPlayer() {
+		if (player == null) return false;
 		var slot = GetRadioSlot();
-		if (slot == null) { Info($"Player does not have {ITEM_DISPLAYNAME}."); return false; }
+		if (slot == null) { Error($"Player does not have {ITEM_DISPLAYNAME}."); return false; }
 		slot.RemoveItem(1); Info($"Took {ITEM_DISPLAYNAME} from player."); return true;
 	}
 
 
-	bool StartBroadcast() {
-		if (audioSource == null) return false;
-		audioTrack = Random.Range(0, audioClips.Count - 1);
-		var audioClip = assetBundle.LoadAsset<AudioClip>(audioClips[audioTrack]);
-		audioSource.clip = audioClip; audioSource.Play();
-		Invoke("StartBroadcast", audioClip.length + .5f);
+	bool broadcast;
+
+	bool SetBroadcastState(bool state) {
+		if (player == null) return false;
+		if (broadcast == state) return false;
+		broadcast = state;
+		if (state) {
+			Broadcast();
+			Info("Broadcasting started.");
+		} else {
+			audioSource.Stop();
+			Info("Broadcasting stopped.");
+		}
 		return true;
 	}
 
-	bool StopBroadcast() {
-		audioSource.Stop();
+	bool Broadcast() {
+		if (player == null) return false;
+		if (!broadcast) return false;
+		audioTrack = Random.Range(0, audioClips.Count - 1);
+		var audioClip = assetBundle.LoadAsset<AudioClip>(audioClips[audioTrack]);
+		if (audioClip == null) {
+			Error("Audio clip became invalid?");
+			return false;
+		}
+		audioSource.clip = audioClip; audioSource.Play();
+		Invoke("Broadcast", audioClip.length + .5f);
+		return true;
+	}
+
+
+	bool RemoveAudioSource() {
+		if (player == null) return false;
+		if (audioGameObject == null) {
+			Error("Audio source does not exist.");
+			return false;
+		}
+		Destroy(audioGameObject);
+		audioGameObject = null;
+		audioEchoFilter = null;
 		audioSource = null;
-		Destroy(audioSource);
+		dropped = false;
+		Info("Audio source removed.");
+		return true;
+	}
+
+	bool CreateAudioSource() {
+		if (player == null) return false;
+		if (audioGameObject != null) {
+			Error("Audio source already exists.");
+			return false;
+		}
+		audioGameObject = new GameObject();
+		audioSource = audioGameObject.AddComponent<AudioSource>();
+		audioEchoFilter = audioGameObject.AddComponent<AudioEchoFilter>();
+	//	audioEchoFilter.enabled = false;
+		audioSource.bypassEffects = true;
+		audioSource.volume = 0;
+		dropped = false;
+		Info("Audio source created.");
 		return true;
 	}
 
@@ -142,16 +194,17 @@ public class OldWorldRadio : Mod {
 			GetEmbeddedFileBytes("oldworldradio.assets"));
 		yield return request;
 		assetBundle = request.assetBundle;
+		Info($"Assets loaded to {assetBundle.name}");
 		var assetNames = new List<string>(assetBundle.GetAllAssetNames());
 		audioClips = assetNames.FindAll(a => a.EndsWith(".ogg"));
-		audioSource = gameObject.AddComponent<AudioSource>();
-		audioSource.volume = 0;
-		StartBroadcast();
+		player = RAPI.GetLocalPlayer();
 		CreateRadioItem();
+		CreateAudioSource();
 		GiveRadioToPlayer();
-		yield return new WaitForSeconds(2f);
+		SetBroadcastState(true);
 		notifyLoad.Close();
 		notifyLoad = null;
+		yield return true;
 	}
 
 
@@ -160,7 +213,7 @@ public class OldWorldRadio : Mod {
 		harmony = new Harmony(HARMONY_ID);
 		harmony.PatchAll(Assembly.GetExecutingAssembly());
 		StartCoroutine(OnModLoad());
-		Info("Mod loaded.");
+		Info($"Mod build {BUILD_NAME} loaded.");
 	}
 
 	public void Update() {
@@ -170,7 +223,8 @@ public class OldWorldRadio : Mod {
 
 	public void OnModUnload() {
 		TakeRadioFromPlayer();
-		StopBroadcast();
+		SetBroadcastState(false);
+		RemoveAudioSource();
 		assetBundle.Unload(true);
 		Info("Mod unloaded.");
 	}
@@ -178,13 +232,18 @@ public class OldWorldRadio : Mod {
 
 	public override void WorldEvent_WorldLoaded() {
 		base.WorldEvent_WorldLoaded();
+		player = RAPI.GetLocalPlayer();
+		CreateAudioSource();
 		GiveRadioToPlayer();
+		SetBroadcastState(true);
 	}
 
 
 	public override void WorldEvent_WorldUnloaded() {
 		base.WorldEvent_WorldUnloaded();
 		TakeRadioFromPlayer();
+		SetBroadcastState(false);
+		RemoveAudioSource();
 		player = null;
 	}
 
