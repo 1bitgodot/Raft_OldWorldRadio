@@ -5,17 +5,20 @@ using System.Reflection;
 using UnityEngine;
 
 public class OldWorldRadio : Mod {
-	const string BUILD_NAME = "Choerry";
+	const string BUILD_NAME = "JinSoul";
 	const string MOD_NAME = "OldWorldRadio";
 	const string HARMONY_ID = "my.1bitgodot.oldworldradio";
 	const string ITEM_NAME = "OldWorldRadio";
 	const string ITEM_DISPLAYNAME = "Old World Radio";
 	const string ITEM_DESCRIPTION = "Old yet quite sophisticated.";
 	const int ITEM_ID = 26913;
-	const float DEFAULT_AUDIO_VOLUME = 0.75f;
+	const float AUDIO_DEFAULT_VOLUME = 0.25f;
+	const float AUDIO_MIN_DISTANCE = 0.7f;
+	const float AUDIO_MAX_DISTANCE = 40f;
+	const float AUDIO_ECHO_WETMIX = 0.2f;
+	const float AUDIO_ECHO_DELAY = 125f;	
 
-
-	enum LogType {
+	enum LogType {	
 		Info,
 		Warning,
 		Error
@@ -36,8 +39,9 @@ public class OldWorldRadio : Mod {
 	AudioEchoFilter audioEchoFilter;
 	AudioSource audioSource;
 	List<string> audioClips;
-	float audioVolume = DEFAULT_AUDIO_VOLUME;
+	float audioVolume = AUDIO_DEFAULT_VOLUME;
 	int audioTrack;
+	bool broadcast;
 
 
 	void Log(string text, LogType type) {
@@ -89,8 +93,11 @@ public class OldWorldRadio : Mod {
 
 	bool UpdateRadioState() {
 		if (player == null) return false;
-		var slot = GetRadioSlot();
-		var status = (slot != null && slot.slotType == SlotType.Hotbar);
+		var status = false;
+		if (!status) {
+			var slot = GetRadioSlot();
+			status = (slot != null && slot.slotType == SlotType.Hotbar);
+		}
 		if (status == radioOn) return false;
 		audioSource.volume = (radioOn = status) ? audioVolume : 0;
 		Info(radioOn ?
@@ -104,6 +111,7 @@ public class OldWorldRadio : Mod {
 		if (player == null) return false;
 		if (GetRadioSlot() != null) {
 			Error($"Player already has {ITEM_DISPLAYNAME}.");
+			radioOn = false;
 			return false;
 		}
 	//	RAPI.GiveItem(radio, 1);
@@ -121,8 +129,6 @@ public class OldWorldRadio : Mod {
 		slot.RemoveItem(1); Info($"Took {ITEM_DISPLAYNAME} from player."); return true;
 	}
 
-
-	bool broadcast;
 
 	bool SetBroadcastState(bool state) {
 		if (player == null) return false;
@@ -143,10 +149,6 @@ public class OldWorldRadio : Mod {
 		if (!broadcast) return false;
 		audioTrack = Random.Range(0, audioClips.Count - 1);
 		var audioClip = assetBundle.LoadAsset<AudioClip>(audioClips[audioTrack]);
-		if (audioClip == null) {
-			Error("Audio clip became invalid?");
-			return false;
-		}
 		audioSource.clip = audioClip; audioSource.Play();
 		Invoke("Broadcast", audioClip.length + .5f);
 		return true;
@@ -177,13 +179,17 @@ public class OldWorldRadio : Mod {
 		audioGameObject = new GameObject();
 		audioSource = audioGameObject.AddComponent<AudioSource>();
 		audioEchoFilter = audioGameObject.AddComponent<AudioEchoFilter>();
-	//	audioEchoFilter.enabled = false;
+		audioEchoFilter.wetMix = AUDIO_ECHO_WETMIX;
+		audioEchoFilter.delay = AUDIO_ECHO_DELAY;
+		audioSource.rolloffMode = AudioRolloffMode.Linear;
+		audioSource.minDistance = AUDIO_MIN_DISTANCE;
+		audioSource.maxDistance = AUDIO_MAX_DISTANCE;
 		audioSource.bypassEffects = true;
 		audioSource.volume = 0;
 		dropped = false;
 		Info("Audio source created.");
 		return true;
-	}
+	}	
 
 	IEnumerator OnModLoad() {
 		if (notifyLoad != null) notifyLoad.Close();
@@ -216,6 +222,7 @@ public class OldWorldRadio : Mod {
 		Info($"Mod build {BUILD_NAME} loaded.");
 	}
 
+
 	public void Update() {
 		UpdateRadioState();
 	}
@@ -247,7 +254,6 @@ public class OldWorldRadio : Mod {
 		player = null;
 	}
 
-
 	public override void LocalPlayerEvent_DropItem(ItemInstance item, Vector3 position, Vector3 direction, bool parentedToRaft) {
 		base.LocalPlayerEvent_DropItem(item, position, direction, parentedToRaft);
 		if (item.UniqueIndex != ITEM_ID) return;
@@ -255,7 +261,7 @@ public class OldWorldRadio : Mod {
 		dropped = true;
 	}
 
-
+		
 	public override void LocalPlayerEvent_PickupItem(PickupItem item) {
 		base.LocalPlayerEvent_PickupItem(item);
 		if (item.itemInstance.UniqueIndex == ITEM_ID) {
