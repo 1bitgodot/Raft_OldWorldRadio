@@ -5,7 +5,7 @@ using System.Reflection;
 using UnityEngine;
 
 public class OldWorldRadio : Mod {
-	const string BUILD_NAME = "JinSoul";
+	const string BUILD_NAME = "Choerry";
 	const string MOD_NAME = "OldWorldRadio";
 	const string HARMONY_ID = "my.1bitgodot.oldworldradio";
 	const string ITEM_NAME = "OldWorldRadio";
@@ -296,6 +296,24 @@ public class OldWorldRadio : Mod {
 		instance.audioVolume = value / 100;
 		instance.audioSource.volume = instance.audioVolume;
 		return $"Radio volume set to {value:N0}%";
+	}
+
+	[ConsoleCommand("radio_debug", "For internal use only.")]
+	public static string RadioDebugCommand(string [] args) {
+		var x = instance;
+		if (x.player != null) {
+			var v1 = x.player.transform.position;
+			x.Info($"Player position: X={v1.x},Y={v1.y},Z={v1.z}");
+		}
+		if (x.gameObject != null) {
+			var v1 = x.gameObject.transform.position;
+			x.Info($"GameObject position: X={v1.x},Y={v1.y},Z={v1.z}");
+		}
+		if (x.audioGameObject != null) {
+			var v1 = x.audioGameObject.transform.position;
+			x.Info($"AudioGameObject position: X={v1.x},Y={v1.y},Z={v1.z}");
+		}
+		return string.Empty;
 	}
 
 }

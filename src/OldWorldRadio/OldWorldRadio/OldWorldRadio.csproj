@@ -58,6 +58,7 @@
     <Reference Include="com.unity.multiplayer-hlapi.Runtime.dll">
       <HintPath>G:\Games\Raft - Update 12\Raft_Data/Managed\com.unity.multiplayer-hlapi.Runtime.dll</HintPath>
     </Reference>
+    <Reference Include="cscompmgd, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="MeshExtension.dll">
       <HintPath>G:\Games\Raft - Update 12\Raft_Data/Managed\MeshExtension.dll</HintPath>
     </Reference>
